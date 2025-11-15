@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Book Scanner — Test Page</title>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 2rem auto; max-width: 900px; }
+      header { margin-bottom: 1rem; }
+      .row { display: flex; gap: 8px; margin: 8px 0; }
+      img.thumb { height: 70px; vertical-align: middle; margin-right: 8px; }
+      li { margin-bottom: 6px; }
+      .muted { color: #666; }
+      .box { border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin: 12px 0; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>AI Book Scanner — Vision + RAG</h1>
+      <p class="muted">Upload a bookshelf image, see detected matches and recommendations.</p>
+    </header>
+
+    <section class="box">
+      <h2>1) Upload bookshelf image</h2>
+      <input id="file" type="file" accept="image/*" />
+      <button id="btnUpload">Scan</button>
+      <span id="busy" class="muted" style="display:none">Processing…</span>
+      <pre id="error" style="color:#b00"></pre>
+    </section>
+
+    <section class="box">
+      <h2>Matches</h2>
+      <ul id="matches"></ul>
+    </section>
+
+    <section class="box">
+      <h2>2) Recommendations</h2>
+      <div class="row">
+        <input id="likes" placeholder="likes (comma separated)" value="fantasy, mystery" />
+        <input id="dislikes" placeholder="dislikes (comma separated)" value="horror" />
+        <button id="btnRecs">Get Recs</button>
+      </div>
+      <ul id="recs"></ul>
+    </section>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const api = (path) => `/api${path}`;
+
+      function liForBook(b) {
+        const li = document.createElement('li');
+        const img = document.createElement('img');
+        if (b.thumbnail) { img.src = b.thumbnail; img.className = 'thumb'; li.appendChild(img); }
+        const strong = document.createElement('strong');
+        strong.textContent = b.title || '(untitled)';
+        li.appendChild(strong);
+        const span = document.createElement('span');
+        span.textContent = ' — ' + (b.authors || []).join(', ');
+        li.appendChild(span);
+        return li;
+      }
+
+      async function uploadScan() {
+        $('error').textContent = '';
+        const f = $('file').files[0];
+        if (!f) { $('error').textContent = 'Please choose an image.'; return; }
+        $('busy').style.display = 'inline';
+        try {
+          const form = new FormData(); form.append('image', f);
+          const res = await fetch(api('/upload/scan'), { method: 'POST', body: form });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+          const ul = $('matches'); ul.innerHTML = '';
+          (data.matches || []).forEach(b => ul.appendChild(liForBook(b)));
+        } catch (e) { $('error').textContent = e.message; } finally { $('busy').style.display = 'none'; }
+      }
+
+      async function fetchRecs() {
+        $('error').textContent = '';
+        const likes = $('likes').value; const dislikes = $('dislikes').value;
+        try {
+          const url = api(`/books/recommendations?likes=${encodeURIComponent(likes)}&dislikes=${encodeURIComponent(dislikes)}`);
+          const res = await fetch(url);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Rec request failed');
+          const ul = $('recs'); ul.innerHTML = '';
+          (data || []).forEach(b => ul.appendChild(liForBook(b)));
+        } catch (e) { $('error').textContent = e.message; }
+      }
+
+      $('btnUpload').addEventListener('click', uploadScan);
+      $('btnRecs').addEventListener('click', fetchRecs);
+    </script>
+  </body>
+  </html>
+
