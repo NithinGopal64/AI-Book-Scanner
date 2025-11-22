@@ -34,12 +34,8 @@
     </section>
 
     <section class="box">
-      <h2>2) Recommendations</h2>
-      <div class="row">
-        <input id="likes" placeholder="likes (comma separated)" value="fantasy, mystery" />
-        <input id="dislikes" placeholder="dislikes (comma separated)" value="horror" />
-        <button id="btnRecs">Get Recs</button>
-      </div>
+      <h2>Recommendations</h2>
+      <p class="muted" id="recHint">Recommendations appear automatically after a scan.</p>
       <ul id="recs"></ul>
     </section>
 
@@ -60,6 +56,22 @@
         return li;
       }
 
+      function renderList(targetId, books = []) {
+        const ul = $(targetId);
+        ul.innerHTML = '';
+        books.forEach((b) => ul.appendChild(liForBook(b)));
+      }
+
+      function showRecommendations(recs = []) {
+        const hint = $('recHint');
+        if (!recs.length) {
+          hint.textContent = 'No recommendations yet. Try scanning more books.';
+        } else {
+          hint.textContent = 'Based on the books detected in your last scan.';
+        }
+        renderList('recs', recs);
+      }
+
       async function uploadScan() {
         $('error').textContent = '';
         const f = $('file').files[0];
@@ -70,27 +82,13 @@
           const res = await fetch(api('/upload/scan'), { method: 'POST', body: form });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Upload failed');
-          const ul = $('matches'); ul.innerHTML = '';
-          (data.matches || []).forEach(b => ul.appendChild(liForBook(b)));
-        } catch (e) { $('error').textContent = e.message; } finally { $('busy').style.display = 'none'; }
-      }
-
-      async function fetchRecs() {
-        $('error').textContent = '';
-        const likes = $('likes').value; const dislikes = $('dislikes').value;
-        try {
-          const url = api(`/books/recommendations?likes=${encodeURIComponent(likes)}&dislikes=${encodeURIComponent(dislikes)}`);
-          const res = await fetch(url);
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Rec request failed');
-          const ul = $('recs'); ul.innerHTML = '';
-          (data || []).forEach(b => ul.appendChild(liForBook(b)));
-        } catch (e) { $('error').textContent = e.message; }
+          renderList('matches', data.matches || []);
+          showRecommendations(data.recommendations || []);
+        } catch (e) { $('error').textContent = e.message; showRecommendations([]); }
+        finally { $('busy').style.display = 'none'; }
       }
 
       $('btnUpload').addEventListener('click', uploadScan);
-      $('btnRecs').addEventListener('click', fetchRecs);
     </script>
   </body>
   </html>
-
