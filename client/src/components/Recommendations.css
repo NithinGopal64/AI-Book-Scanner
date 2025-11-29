@@ -1,0 +1,27 @@
+.recommendations-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  margin: 3rem 0;
+}
+
+.recommendations-header {
+  margin-bottom: 1.5rem;
+}
+
+.recommendations-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-top: 0.5rem;
+}
+
+.icon {
+  font-size: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .recommendations-section {
+    padding: 1.5rem;
+  }
+}
+
