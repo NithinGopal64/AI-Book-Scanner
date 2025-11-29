@@ -21,16 +21,26 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      // In production, you might want to be more strict
-      if (process.env.NODE_ENV === 'production') {
-        callback(new Error('Not allowed by CORS'));
-      } else {
-        callback(null, true); // Allow in development
-      }
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
     }
+    
+    // In production, allow Render static sites
+    if (process.env.NODE_ENV === 'production') {
+      // Allow any Render.com subdomain
+      if (origin && origin.includes('.onrender.com')) {
+        return callback(null, true);
+      }
+      // Allow specific frontend URL if set
+      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    }
+    
+    // Allow all in development
+    callback(null, true);
   },
   credentials: true,
 }));
@@ -46,6 +56,6 @@ app.use('/api/books', booksRouter);
 app.use('/api/prefs', prefsRouter);
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`API running on :${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`API running on port ${port}`);
 });
