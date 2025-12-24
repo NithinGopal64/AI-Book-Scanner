@@ -78,6 +78,41 @@
   font-size: 1.1rem;
 }
 
+.scanning-hint {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  opacity: 0.8;
+}
+
+.connection-warning {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  text-align: center;
+  color: #92400e;
+}
+
+.connection-warning p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.error-actions {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.error-actions .btn {
+  min-height: 44px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  -webkit-tap-highlight-color: rgba(0, 122, 255, 0.2);
+  touch-action: manipulation;
+}
+
 .titles-list {
   display: flex;
   flex-direction: column;

@@ -2,12 +2,72 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
+// Create axios instance with default timeout (30 seconds for normal requests)
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000, // 30 seconds default timeout
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Request interceptor for better error tracking
+api.interceptors.request.use(
+  (config) => {
+    // Log request in development
+    if (import.meta.env.DEV) {
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle network errors
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED') {
+        error.userMessage = 'Request timed out. The server may be slow or unreachable. Please try again.';
+      } else if (error.message === 'Network Error') {
+        error.userMessage = 'Network error. Please check your connection and try again.';
+      } else {
+        error.userMessage = 'Unable to connect to server. Please try again later.';
+      }
+    } else {
+      // Handle HTTP errors
+      const status = error.response.status;
+      if (status === 500) {
+        error.userMessage = 'Server error. Please try again later.';
+      } else if (status === 504 || status === 503) {
+        error.userMessage = 'Server is temporarily unavailable. Please try again in a moment.';
+      } else if (status === 413) {
+        error.userMessage = 'Image file is too large. Please use a smaller image.';
+      } else {
+        error.userMessage = error.response?.data?.error || `Error: ${status}`;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Retry logic for failed requests
+async function retryRequest(requestFn, retries = 2, delay = 1000) {
+  try {
+    return await requestFn();
+  } catch (error) {
+    if (retries > 0 && (!error.response || error.response.status >= 500 || error.code === 'ECONNABORTED')) {
+      // Retry on server errors or timeouts
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return retryRequest(requestFn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
 
 /**
  * Upload an image and scan for books
@@ -18,11 +78,15 @@ export const uploadScan = async (imageFile) => {
   const formData = new FormData();
   formData.append('image', imageFile);
   
-  const response = await api.post('/upload/scan', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Use longer timeout for uploads (120 seconds) since recommendations can take time
+  const response = await retryRequest(() => 
+    api.post('/upload/scan', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 120000, // 120 seconds for upload + processing
+    })
+  );
   
   return response.data;
 };
@@ -86,7 +150,12 @@ export const getRecommendationsFromTitles = async (titles) => {
  * @returns {Promise} Object with recommendations array and applied filters
  */
 export const getFilteredRecommendations = async (filters) => {
-  const response = await api.post('/books/recommendations/filtered', filters);
+  // Use longer timeout for recommendation requests (90 seconds)
+  const response = await retryRequest(() =>
+    api.post('/books/recommendations/filtered', filters, {
+      timeout: 90000, // 90 seconds for recommendation generation
+    })
+  );
   return response.data;
 };
 
@@ -104,8 +173,23 @@ export const getFilterOptions = async () => {
  * @returns {Promise} Health status
  */
 export const checkHealth = async () => {
-  const response = await api.get('/health');
+  const response = await api.get('/health', {
+    timeout: 5000, // 5 seconds for health check
+  });
   return response.data;
+};
+
+/**
+ * Check if API is reachable (for connection status)
+ * @returns {Promise<boolean>} True if API is reachable
+ */
+export const checkConnection = async () => {
+  try {
+    await checkHealth();
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 export default api;

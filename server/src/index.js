@@ -26,16 +26,21 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // In production, allow Render static sites
     if (process.env.NODE_ENV === 'production') {
-      // Allow any Render.com subdomain
-      if (origin && origin.includes('.onrender.com')) {
+     
+      if (origin && (origin.includes('.onrender.com') || origin.includes('render.com'))) {
         return callback(null, true);
       }
-      // Allow specific frontend URL if set
-      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
-        return callback(null, true);
+      // Allow specific frontend URL if set (with or without trailing slash)
+      if (process.env.FRONTEND_URL) {
+        const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, ''); // Remove trailing slash
+        const originUrl = origin.replace(/\/$/, '');
+        if (originUrl === frontendUrl) {
+          return callback(null, true);
+        }
       }
+     
+      console.warn(`CORS: Blocked origin: ${origin}`);
       return callback(new Error('Not allowed by CORS'));
     }
     
@@ -43,6 +48,8 @@ app.use(cors({
     callback(null, true);
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json({ limit: '10mb' }));

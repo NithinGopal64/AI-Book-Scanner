@@ -98,8 +98,10 @@
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
@@ -111,6 +113,8 @@
   justify-content: center;
   transition: all 0.3s ease;
   z-index: 5;
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.3);
+  touch-action: manipulation;
 }
 
 .preview-remove-btn:hover {
@@ -133,6 +137,8 @@
   .upload-area {
     padding: 2rem 1rem;
     min-height: 250px;
+    -webkit-tap-highlight-color: rgba(0, 122, 255, 0.1);
+    touch-action: manipulation;
   }
 
   .upload-icon {
@@ -141,6 +147,21 @@
 
   .upload-content h3 {
     font-size: 1.25rem;
+  }
+
+  .preview-remove-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .preview-actions .btn {
+    min-height: 44px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    -webkit-tap-highlight-color: rgba(0, 122, 255, 0.2);
+    touch-action: manipulation;
   }
 }
 

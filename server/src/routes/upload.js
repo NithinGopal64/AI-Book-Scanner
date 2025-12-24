@@ -8,11 +8,43 @@ import Scan from '../models/Scan.js';
 import Book from '../models/Book.js';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
 
+// Set timeout for the entire request (120 seconds)
 router.post('/scan', upload.single('image'), async (req, res) => {
+  // Set a timeout for the entire request
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'Request timeout. Processing took too long. Please try again with a smaller image or fewer books.' });
+    }
+  }, 120000); // 120 seconds
+
+  // Clear timeout if request completes
+  const clearTimeoutOnFinish = () => {
+    clearTimeout(timeout);
+  };
+
+  req.on('close', clearTimeoutOnFinish);
+  req.on('aborted', clearTimeoutOnFinish);
+
   try {
-    if (!req.file) return res.status(400).json({ error: 'Image is required' });
+    if (!req.file) {
+      clearTimeout(timeout);
+      return res.status(400).json({ error: 'Image is required' });
+    }
+
+    // Check file size
+    if (req.file.size > 10 * 1024 * 1024) {
+      clearTimeout(timeout);
+      return res.status(413).json({ error: 'Image file is too large. Maximum size is 10MB.' });
+    }
+
+    console.log(`[Upload] Processing image: ${req.file.size} bytes, ${req.file.mimetype}`);
     
     // Clear previously stored books so each scan starts fresh
     // This ensures previous scans don't influence the latest results
@@ -26,14 +58,18 @@ router.post('/scan', upload.single('image'), async (req, res) => {
     }
     
     // Extract book titles from image first
+    console.log('[Upload] Extracting book titles from image...');
     const candidates = await visionExtractFromBuffer(req.file.buffer);
     const allScannedTitles = candidates
       .filter(c => c?.title)
       .map(c => c.title)
       .filter(Boolean);
+    console.log(`[Upload] Found ${allScannedTitles.length} potential book titles`);
 
     // Process the image to get full book metadata
+    console.log('[Upload] Processing book metadata...');
     const books = await processScanImage(req.file.buffer);
+    console.log(`[Upload] Processed ${books.length} books`);
     
     // Only include titles that were successfully matched to books
     // This ensures "Detected Titles" matches "Your Books"
@@ -53,6 +89,7 @@ router.post('/scan', upload.single('image'), async (req, res) => {
     
     if (useLLMRecommendations && books.length > 0) {
       // NEW: Use LLM-based recommendations with explanations (better approach)
+      console.log('[Upload] Generating LLM recommendations...');
       try {
         const llmRecs = await recommendWithLLM(books, { limit: 5 });
         // LLM recommendations now come pre-enriched with full metadata
@@ -136,6 +173,9 @@ router.post('/scan', upload.single('image'), async (req, res) => {
     
     const populated = await scan.populate('matchedBooks');
     
+    clearTimeout(timeout);
+    console.log(`[Upload] Successfully processed scan: ${scannedTitles.length} titles, ${books.length} books, ${recommendationsFiltered.length} recommendations`);
+    
     res.json({ 
       scanId: scan._id, 
       scannedTitles,
@@ -148,8 +188,26 @@ router.post('/scan', upload.single('image'), async (req, res) => {
       }
     });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'vision or lookup failed', details: e.message });
+    clearTimeout(timeout);
+    console.error('[Upload] Error:', e);
+    
+    // Check if client disconnected
+    if (req.aborted || !res.headersSent) {
+      console.log('[Upload] Client disconnected, aborting response');
+      return;
+    }
+    
+    // Provide user-friendly error messages
+    let errorMessage = 'Failed to process image';
+    if (e.message?.includes('timeout') || e.message?.includes('TIMEOUT')) {
+      errorMessage = 'Processing timeout. The image may be too large or complex. Please try a smaller image.';
+    } else if (e.message?.includes('rate limit') || e.status === 429) {
+      errorMessage = 'Service is temporarily busy. Please try again in a moment.';
+    } else if (e.message) {
+      errorMessage = `Processing error: ${e.message}`;
+    }
+    
+    res.status(500).json({ error: errorMessage, details: process.env.NODE_ENV === 'development' ? e.message : undefined });
   }
 });
 

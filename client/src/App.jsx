@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import ImageUpload from './components/ImageUpload';
 import BookCarousel from './components/BookCarousel';
@@ -6,7 +6,7 @@ import RecommendationFilters from './components/RecommendationFilters';
 import ScrollAnimation from './components/ScrollAnimation';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorMessage from './components/ErrorMessage';
-import { uploadScan } from './api';
+import { uploadScan, checkConnection } from './api';
 import './App.css';
 
 // Helper function to convert text to Title Case
@@ -22,28 +22,95 @@ function App() {
   const [accumulatedRecommendations, setAccumulatedRecommendations] = useState([]); // All recommendations (initial + filtered)
   const [currentFilteredRecommendations, setCurrentFilteredRecommendations] = useState([]); // Current filtered recommendations
   const [activeSection, setActiveSection] = useState('discover');
+  const [isConnected, setIsConnected] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState('');
   const uploadSectionRef = useRef(null);
   const librarySectionRef = useRef(null);
+  const retryCountRef = useRef(0);
+  const lastUploadedFileRef = useRef(null);
 
-  const handleScan = async (imageFile) => {
-    setScanning(true);
-    setError(null);
-    setScanResult(null);
-    setAccumulatedRecommendations([]);
-    setCurrentFilteredRecommendations([]);
+  // Check connection status periodically
+  useEffect(() => {
+    const checkConnectionStatus = async () => {
+      const connected = await checkConnection();
+      setIsConnected(connected);
+    };
+    
+    checkConnectionStatus();
+    const interval = setInterval(checkConnectionStatus, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleScan = async (imageFile, retry = false) => {
+    if (!retry) {
+      setScanning(true);
+      setError(null);
+      setScanResult(null);
+      setAccumulatedRecommendations([]);
+      setCurrentFilteredRecommendations([]);
+      retryCountRef.current = 0;
+      lastUploadedFileRef.current = imageFile;
+    } else {
+      retryCountRef.current += 1;
+    }
+
+    // Update progress messages
+    const progressMessages = [
+      'Uploading image...',
+      'Extracting book titles...',
+      'Fetching book metadata...',
+      'Generating recommendations...',
+    ];
+    let progressIndex = 0;
+    const progressInterval = setInterval(() => {
+      if (progressIndex < progressMessages.length - 1) {
+        progressIndex += 1;
+        setLoadingProgress(progressMessages[progressIndex]);
+      }
+    }, 15000); // Update every 15 seconds
 
     try {
+      setLoadingProgress(progressMessages[0]);
       const result = await uploadScan(imageFile);
+      clearInterval(progressInterval);
+      setLoadingProgress('');
       setScanResult(result);
       // Initialize accumulated recommendations with initial recommendations
       if (result.recommendations && result.recommendations.length > 0) {
         setAccumulatedRecommendations(result.recommendations);
       }
+      retryCountRef.current = 0;
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to scan image');
+      clearInterval(progressInterval);
+      setLoadingProgress('');
+      const errorMessage = err.userMessage || err.response?.data?.error || err.message || 'Failed to scan image';
+      
+      // Check if it's a network error and we haven't retried too many times
+      const isNetworkError = !err.response || err.code === 'ECONNABORTED' || err.message === 'Network Error';
+      const maxRetries = 2;
+      
+      if (isNetworkError && retryCountRef.current < maxRetries) {
+        // Auto-retry for network errors
+        setTimeout(() => {
+          handleScan(imageFile, true);
+        }, 2000 * (retryCountRef.current + 1)); // Exponential backoff
+        setError(`${errorMessage} (Retrying ${retryCountRef.current + 1}/${maxRetries})...`);
+        return;
+      }
+      
+      setError(errorMessage);
       console.error('Scan error:', err);
     } finally {
-      setScanning(false);
+      if (retryCountRef.current === 0 || retryCountRef.current >= 2) {
+        setScanning(false);
+      }
+    }
+  };
+
+  const handleRetry = () => {
+    if (lastUploadedFileRef.current) {
+      handleScan(lastUploadedFileRef.current, false);
     }
   };
 
@@ -90,11 +157,29 @@ function App() {
           {scanning && (
             <div className="scanning-status">
               <LoadingSpinner />
-              <p>Scanning your bookshelf... This may take a moment.</p>
+              <p>{loadingProgress || 'Scanning your bookshelf... This may take a moment.'}</p>
+              <p className="scanning-hint">Processing can take 30-60 seconds. Please wait...</p>
             </div>
           )}
 
-          {error && <ErrorMessage message={error} />}
+          {!isConnected && !scanning && (
+            <div className="connection-warning">
+              <p>⚠️ Connection issue detected. Please check your internet connection.</p>
+            </div>
+          )}
+
+          {error && (
+            <div>
+              <ErrorMessage message={error} />
+              {lastUploadedFileRef.current && (
+                <div className="error-actions">
+                  <button className="btn btn-primary" onClick={handleRetry}>
+                    Retry Upload
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {scanResult && (
             <>

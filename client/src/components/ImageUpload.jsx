@@ -34,8 +34,16 @@ function ImageUpload({ onUpload, disabled }) {
   };
 
   const handleFile = (file) => {
+    // Check file type
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      alert('Please upload an image file (JPG, PNG, etc.)');
+      return;
+    }
+
+    // Check file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('Image file is too large. Please use an image smaller than 10MB.');
       return;
     }
 
@@ -46,6 +54,11 @@ function ImageUpload({ onUpload, disabled }) {
     const reader = new FileReader();
     reader.onload = (e) => {
       setPreview(e.target.result);
+    };
+    reader.onerror = () => {
+      alert('Failed to read image file. Please try another image.');
+      setSelectedFile(null);
+      setPreview(null);
     };
     reader.readAsDataURL(file);
   };
@@ -84,6 +97,7 @@ function ImageUpload({ onUpload, disabled }) {
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          capture="environment"
           onChange={handleChange}
           disabled={disabled}
           style={{ display: 'none' }}
@@ -138,8 +152,8 @@ function ImageUpload({ onUpload, disabled }) {
               </svg>
             </div>
             <h3>Upload Bookshelf Image</h3>
-            <p>Drag and drop an image here, or click to select</p>
-            <p className="upload-hint">Supports JPG, PNG, and other image formats</p>
+            <p>Tap to take a photo or select from gallery</p>
+            <p className="upload-hint">Supports JPG, PNG, and other image formats (max 10MB)</p>
           </div>
         )}
       </div>
