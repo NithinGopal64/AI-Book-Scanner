@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { generateAmazonLink, hasAmazonLink } from '../utils/amazonLinks';
 import './BookCard.css';
 
 function BookCard({ book, variant = 'grid' }) {
@@ -17,6 +18,8 @@ function BookCard({ book, variant = 'grid' }) {
   const description = book.description || 'No description available.';
   const rating = book.advancedMetadata?.averageRating;
   const ratingsCount = book.advancedMetadata?.ratingsCount;
+  const amazonLink = generateAmazonLink(book);
+  const showAmazonButton = hasAmazonLink(book);
 
   return (
     <div 
@@ -107,6 +110,27 @@ function BookCard({ book, variant = 'grid' }) {
                   </div>
                 )}
               </div>
+
+              {showAmazonButton && (
+                <a
+                  href={amazonLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="amazon-button amazon-button-hover"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <path d="M16 10a4 4 0 0 1-8 0"/>
+                  </svg>
+                  <span>Buy on Amazon</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M7 17L17 7"/>
+                    <path d="M7 7h10v10"/>
+                  </svg>
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -151,6 +175,26 @@ function BookCard({ book, variant = 'grid' }) {
                   <span key={index} className="genre-tag">{genre}</span>
                 ))}
               </div>
+            )}
+
+            {showAmazonButton && (
+              <a
+                href={amazonLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="amazon-button amazon-button-grid"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <path d="M16 10a4 4 0 0 1-8 0"/>
+                </svg>
+                <span>Buy on Amazon</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M7 17L17 7"/>
+                  <path d="M7 7h10v10"/>
+                </svg>
+              </a>
             )}
           </>
         )}
