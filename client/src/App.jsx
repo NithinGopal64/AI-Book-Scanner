@@ -29,6 +29,25 @@ function App() {
   const retryCountRef = useRef(0);
   const lastUploadedFileRef = useRef(null);
 
+  // Helper function to create a unique key for a book
+  const getBookKey = (book) => {
+    // Use ISBN-13 if available (most unique)
+    if (book.isbn13) {
+      const cleanIsbn = String(book.isbn13).replace(/[^\dX]/gi, '').toUpperCase();
+      if (cleanIsbn.length === 13) return `isbn13:${cleanIsbn}`;
+    }
+    // Use ISBN-10 if available
+    if (book.isbn10) {
+      const cleanIsbn = String(book.isbn10).replace(/[^\dX]/gi, '').toUpperCase();
+      if (cleanIsbn.length === 10) return `isbn10:${cleanIsbn}`;
+    }
+    // Fallback to title + first author (normalized)
+    const title = String(book.title || book.book?.title || '').toLowerCase().trim();
+    const authors = book.authors || book.book?.authors || [];
+    const author = authors.length > 0 ? String(authors[0]).toLowerCase().trim() : '';
+    return `title:${title}|author:${author}`;
+  };
+
   // Check connection status periodically
   useEffect(() => {
     const checkConnectionStatus = async () => {
@@ -76,9 +95,17 @@ function App() {
       clearInterval(progressInterval);
       setLoadingProgress('');
       setScanResult(result);
-      // Initialize accumulated recommendations with initial recommendations
+      // Initialize accumulated recommendations with initial recommendations (deduplicated)
       if (result.recommendations && result.recommendations.length > 0) {
-        setAccumulatedRecommendations(result.recommendations);
+        // Deduplicate initial recommendations using unique book keys
+        const seenKeys = new Set();
+        const uniqueRecommendations = result.recommendations.filter(book => {
+          const key = getBookKey(book);
+          if (!key || seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+        setAccumulatedRecommendations(uniqueRecommendations);
       }
       retryCountRef.current = 0;
     } catch (err) {
@@ -119,11 +146,11 @@ function App() {
       // Before setting new filtered recommendations, append current ones to accumulated (if any)
       if (current && current.length > 0) {
         setAccumulatedRecommendations(prev => {
-          // Deduplicate by book title to avoid showing the same book twice
-          const existingTitles = new Set(prev.map(b => String(b.title || b.book?.title || '').toLowerCase().trim()));
+          // Deduplicate using unique book keys (ISBN or title+author)
+          const existingKeys = new Set(prev.map(b => getBookKey(b)));
           const newBooks = current.filter(b => {
-            const title = String(b.title || b.book?.title || '').toLowerCase().trim();
-            return title && !existingTitles.has(title);
+            const key = getBookKey(b);
+            return key && !existingKeys.has(key);
           });
           return [...prev, ...newBooks];
         });
@@ -220,24 +247,46 @@ function App() {
               {scanResult.recommendations && scanResult.recommendations.length > 0 && (
                 <>
                   {/* Main Recommendations Carousel - accumulates all recommendations */}
-                  {accumulatedRecommendations.length > 0 && (
-                    <ScrollAnimation delay={200}>
-                      <BookCarousel 
-                        books={accumulatedRecommendations} 
-                        title={`Recommendations for You (${accumulatedRecommendations.length})`}
-                      />
-                    </ScrollAnimation>
-                  )}
+                  {(() => {
+                    // Deduplicate accumulated recommendations before displaying
+                    const seenKeys = new Set();
+                    const uniqueAccumulated = accumulatedRecommendations.filter(book => {
+                      const key = getBookKey(book);
+                      if (!key || seenKeys.has(key)) return false;
+                      seenKeys.add(key);
+                      return true;
+                    });
+                    
+                    return uniqueAccumulated.length > 0 ? (
+                      <ScrollAnimation delay={200}>
+                        <BookCarousel 
+                          books={uniqueAccumulated} 
+                          title={`Recommendations for You (${uniqueAccumulated.length})`}
+                        />
+                      </ScrollAnimation>
+                    ) : null;
+                  })()}
                   
                   {/* Filtered Recommendations Carousel - shows current filtered results */}
-                  {currentFilteredRecommendations.length > 0 && (
-                    <ScrollAnimation delay={210}>
-                      <BookCarousel 
-                        books={currentFilteredRecommendations} 
-                        title={`Filtered Recommendations (${currentFilteredRecommendations.length})`}
-                      />
-                    </ScrollAnimation>
-                  )}
+                  {(() => {
+                    // Deduplicate filtered recommendations before displaying
+                    const seenKeys = new Set();
+                    const uniqueFiltered = currentFilteredRecommendations.filter(book => {
+                      const key = getBookKey(book);
+                      if (!key || seenKeys.has(key)) return false;
+                      seenKeys.add(key);
+                      return true;
+                    });
+                    
+                    return uniqueFiltered.length > 0 ? (
+                      <ScrollAnimation delay={210}>
+                        <BookCarousel 
+                          books={uniqueFiltered} 
+                          title={`Filtered Recommendations (${uniqueFiltered.length})`}
+                        />
+                      </ScrollAnimation>
+                    ) : null;
+                  })()}
                   
                   <ScrollAnimation delay={250}>
                     <RecommendationFilters
