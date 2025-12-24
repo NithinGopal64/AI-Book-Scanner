@@ -81,6 +81,25 @@ export const getRecommendationsFromTitles = async (titles) => {
 };
 
 /**
+ * Get filtered recommendations based on user-selected filters
+ * @param {Object} filters - Filter options { authorPreference, languages, genres, limit }
+ * @returns {Promise} Object with recommendations array and applied filters
+ */
+export const getFilteredRecommendations = async (filters) => {
+  const response = await api.post('/books/recommendations/filtered', filters);
+  return response.data;
+};
+
+/**
+ * Get available filter options (languages, genres, authors) from scanned books
+ * @returns {Promise} Object with languages, genres, and authors arrays
+ */
+export const getFilterOptions = async () => {
+  const response = await api.get('/books/filter-options');
+  return response.data;
+};
+
+/**
  * Check API health
  * @returns {Promise} Health status
  */

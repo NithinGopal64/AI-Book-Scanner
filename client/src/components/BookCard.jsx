@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './BookCard.css';
 
 function BookCard({ book, variant = 'grid' }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  
+  // Reset expanded description when hover ends
+  useEffect(() => {
+    if (!isHovered) {
+      setShowFullDescription(false);
+    }
+  }, [isHovered]);
   const authors = book.authors || [];
   const genres = book.genre || book.categories || [];
   const year = book.publicationYear;
@@ -53,12 +61,39 @@ function BookCard({ book, variant = 'grid' }) {
                 </div>
               )}
 
+              {/* Show recommendation reason if available (LLM recommendations) */}
+              {book.reason && (
+                <div className="hover-reason" style={{ 
+                  padding: '8px', 
+                  background: 'rgba(59, 130, 246, 0.1)', 
+                  borderRadius: '4px', 
+                  marginBottom: '8px',
+                  fontSize: '0.875rem',
+                  color: '#93c5fd'
+                }}>
+                  <strong>💡 Why we recommend:</strong> {book.reason}
+                </div>
+              )}
+
               {description && (
-                <p className="hover-description">
-                  {description.length > 200 
-                    ? description.substring(0, 200) + '...' 
-                    : description}
-                </p>
+                <div className="hover-description-container">
+                  <p className="hover-description">
+                    {!showFullDescription && description.length > 500
+                      ? description.substring(0, 500) + '...'
+                      : description}
+                  </p>
+                  {description.length > 500 && (
+                    <button
+                      className="read-more-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowFullDescription(!showFullDescription);
+                      }}
+                    >
+                      {showFullDescription ? 'Show Less' : 'Read More'}
+                    </button>
+                  )}
+                </div>
               )}
 
               <div className="hover-meta">
@@ -83,6 +118,18 @@ function BookCard({ book, variant = 'grid' }) {
         {authors.length > 0 && (
           <p className="book-authors">
             {authors.join(', ')}
+          </p>
+        )}
+
+        {/* Show recommendation reason for recommendations */}
+        {book.reason && (
+          <p className="book-reason" style={{ 
+            fontSize: '0.75rem', 
+            color: '#60a5fa', 
+            fontStyle: 'italic',
+            marginTop: '4px'
+          }}>
+            {book.reason}
           </p>
         )}
 

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import Header from './components/Header';
 import ImageUpload from './components/ImageUpload';
 import BookCarousel from './components/BookCarousel';
+import RecommendationFilters from './components/RecommendationFilters';
 import ScrollAnimation from './components/ScrollAnimation';
 import LoadingSpinner from './components/LoadingSpinner';
 import ErrorMessage from './components/ErrorMessage';
@@ -18,6 +19,8 @@ function App() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState(null);
   const [scanResult, setScanResult] = useState(null);
+  const [accumulatedRecommendations, setAccumulatedRecommendations] = useState([]); // All recommendations (initial + filtered)
+  const [currentFilteredRecommendations, setCurrentFilteredRecommendations] = useState([]); // Current filtered recommendations
   const [activeSection, setActiveSection] = useState('discover');
   const uploadSectionRef = useRef(null);
   const librarySectionRef = useRef(null);
@@ -26,16 +29,41 @@ function App() {
     setScanning(true);
     setError(null);
     setScanResult(null);
+    setAccumulatedRecommendations([]);
+    setCurrentFilteredRecommendations([]);
 
     try {
       const result = await uploadScan(imageFile);
       setScanResult(result);
+      // Initialize accumulated recommendations with initial recommendations
+      if (result.recommendations && result.recommendations.length > 0) {
+        setAccumulatedRecommendations(result.recommendations);
+      }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Failed to scan image');
       console.error('Scan error:', err);
     } finally {
       setScanning(false);
     }
+  };
+
+  const handleFilteredRecommendations = (newFilteredRecommendations) => {
+    setCurrentFilteredRecommendations(current => {
+      // Before setting new filtered recommendations, append current ones to accumulated (if any)
+      if (current && current.length > 0) {
+        setAccumulatedRecommendations(prev => {
+          // Deduplicate by book title to avoid showing the same book twice
+          const existingTitles = new Set(prev.map(b => String(b.title || b.book?.title || '').toLowerCase().trim()));
+          const newBooks = current.filter(b => {
+            const title = String(b.title || b.book?.title || '').toLowerCase().trim();
+            return title && !existingTitles.has(title);
+          });
+          return [...prev, ...newBooks];
+        });
+      }
+      // Return new filtered recommendations
+      return newFilteredRecommendations || [];
+    });
   };
 
   const handleNavClick = (section) => {
@@ -105,12 +133,35 @@ function App() {
               )}
 
               {scanResult.recommendations && scanResult.recommendations.length > 0 && (
-                <ScrollAnimation delay={200}>
-                  <BookCarousel 
-                    books={scanResult.recommendations} 
-                    title="Recommendations for You"
-                  />
-                </ScrollAnimation>
+                <>
+                  {/* Main Recommendations Carousel - accumulates all recommendations */}
+                  {accumulatedRecommendations.length > 0 && (
+                    <ScrollAnimation delay={200}>
+                      <BookCarousel 
+                        books={accumulatedRecommendations} 
+                        title={`Recommendations for You (${accumulatedRecommendations.length})`}
+                      />
+                    </ScrollAnimation>
+                  )}
+                  
+                  {/* Filtered Recommendations Carousel - shows current filtered results */}
+                  {currentFilteredRecommendations.length > 0 && (
+                    <ScrollAnimation delay={210}>
+                      <BookCarousel 
+                        books={currentFilteredRecommendations} 
+                        title={`Filtered Recommendations (${currentFilteredRecommendations.length})`}
+                      />
+                    </ScrollAnimation>
+                  )}
+                  
+                  <ScrollAnimation delay={250}>
+                    <RecommendationFilters
+                      scannedBooks={scanResult.matches || []}
+                      onRecommendationsGenerated={handleFilteredRecommendations}
+                      alreadyRecommendedBooks={[...accumulatedRecommendations, ...currentFilteredRecommendations]}
+                    />
+                  </ScrollAnimation>
+                </>
               )}
             </>
           )}

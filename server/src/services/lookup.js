@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Google Books API lookup - primary source for rich metadata
-// Note: Google Books API doesn't require an API key, but you can add one for higher rate limits
+// Note: Google Books API doesn't require an API key
 export async function lookupGoogleBooks(q, { limit = 3 } = {}) {
   try {
     let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=${limit}`;
@@ -61,7 +61,7 @@ export async function lookupGoogleBooks(q, { limit = 3 } = {}) {
           subtitle: volumeInfo.subtitle || null,
           publishedDate: publishedDate || null,
           industryIdentifiers: industryIdentifiers.map((id) => ({
-            identifierType: id.type, // Map 'type' from API to 'identifierType' in schema
+            identifierType: id.type, 
             identifier: id.identifier,
           })),
           dimensions: volumeInfo.dimensions || null,
@@ -107,10 +107,10 @@ function mapDocToMeta(d) {
 
 export async function lookupOpenLibrary(q, { limit = 3 } = {}) {
   try {
-    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=${limit}`;
-    const { data } = await axios.get(url);
-    const docs = data?.docs || [];
-    return docs.map(mapDocToMeta);
+  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=${limit}`;
+  const { data } = await axios.get(url);
+  const docs = data?.docs || [];
+  return docs.map(mapDocToMeta);
   } catch (error) {
     console.error('Open Library API error:', error.message);
     return [];
